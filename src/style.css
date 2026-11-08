@@ -1,0 +1,335 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #f7f8f4;
+  color: #263d35;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Apple SD Gothic Neo",
+    sans-serif;
+}
+header {
+  max-width: 1120px;
+  margin: auto;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 25px 30px;
+  border-bottom: 1px solid #dce2d9;
+}
+header > div {
+  margin-left: auto;
+  font-size: 14px;
+}
+.brand {
+  font-size: 30px;
+  font-weight: 800;
+  color: inherit;
+  text-decoration: none;
+}
+.brand span {
+  font-size: 10px;
+  letter-spacing: 2px;
+  margin-left: 16px;
+}
+.badge {
+  font-size: 11px;
+  border: 1px solid #ccd6ca;
+  padding: 5px 9px;
+  border-radius: 20px;
+}
+main {
+  max-width: 1120px;
+  margin: auto;
+  padding: 48px 30px 20px;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #708276;
+}
+h1 {
+  font-size: 48px;
+  line-height: 1.25;
+  letter-spacing: -2px;
+  margin: 20px 0;
+}
+h2 {
+  font-size: 21px;
+  margin-top: 0;
+}
+.intro,
+.muted {
+  color: #748277;
+  font-size: 14px;
+}
+.columns {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 24px;
+}
+.panel,
+.login {
+  background: white;
+  border: 1px solid #dfe5db;
+  border-radius: 15px;
+  padding: 26px;
+}
+.login {
+  max-width: 410px;
+}
+.login p,
+small {
+  color: #748277;
+  font-size: 12px;
+}
+form {
+  display: grid;
+  gap: 18px;
+  margin: 24px 0;
+}
+label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+input,
+select {
+  padding: 12px;
+  border: 1px solid #d6dfd2;
+  border-radius: 7px;
+  background: #fff;
+  font: inherit;
+  color: inherit;
+}
+.login-field {
+  display: grid;
+  gap: 8px;
+}
+.login-field input[aria-invalid="true"] {
+  border: 2px solid #b42318;
+  background: #fff5f4;
+}
+.login-field input[aria-invalid="true"]:focus {
+  outline: none;
+  border-color: #781b14;
+}
+.field-error {
+  color: #b42318;
+  font-size: 12px;
+}
+button {
+  cursor: pointer;
+  border: 1px solid #ccd6ca;
+  background: #fff;
+  color: #315342;
+  border-radius: 7px;
+  padding: 9px 14px;
+  font: inherit;
+  font-size: 13px;
+}
+button:hover:not(:disabled) {
+  background: #eaf1e6;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.primary {
+  background: #315b42;
+  color: white;
+  padding: 14px;
+}
+.room {
+  background: #dfe9d7;
+  border-radius: 15px;
+  padding: 27px 30px;
+  margin-bottom: 18px;
+}
+.room span {
+  letter-spacing: 2px;
+  font-size: 10px;
+}
+.room h2 {
+  font-size: 27px;
+  margin: 15px 0 10px;
+}
+.room p {
+  font-size: 13px;
+  margin: 0;
+}
+.slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 22px;
+}
+.slots button {
+  width: 100%;
+  padding: 15px 5px;
+}
+.slots strong,
+.slots small {
+  display: block;
+}
+.slots small {
+  margin-top: 5px;
+  font-size: 10px;
+}
+.slots .lock {
+  padding: 5px;
+  font-size: 10px;
+  margin-top: 3px;
+}
+.history {
+  align-self: start;
+  min-height: 300px;
+}
+.empty {
+  padding: 70px 0;
+  text-align: center;
+  line-height: 2;
+  color: #728274;
+}
+article {
+  border-top: 1px solid #e7ece3;
+  padding: 20px 0;
+}
+article h3 {
+  font-size: 15px;
+}
+article p {
+  font-size: 12px;
+  color: #748277;
+}
+article span {
+  font-size: 11px;
+}
+.confirmed {
+  color: #32713c;
+}
+.notice {
+  min-height: 20px;
+  color: #945229;
+  font-size: 14px;
+}
+footer {
+  margin-top: 55px;
+  padding: 25px 0;
+  border-top: 1px solid #dce2d9;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #7c8a7e;
+  display: flex;
+  justify-content: space-between;
+}
+@media (max-width: 650px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+  h1 {
+    font-size: 38px;
+  }
+  header,
+  main {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .brand span {
+    display: none;
+  }
+  header {
+    gap: 12px;
+  }
+  .panel {
+    padding: 20px;
+  }
+}
+
+.slots button[aria-pressed="true"] {
+  background: #315b42;
+  color: white;
+  border-color: #315b42;
+  box-shadow: 0 0 0 2px #c0d4b5;
+}
+.slots button[aria-pressed="true"] small {
+  color: #e4eddf;
+}
+.primary:hover:not(:disabled) {
+  background: #234632;
+  color: white;
+}
+.summary {
+  border-top: 1px solid #dfe5db;
+  margin-top: 26px;
+  padding-top: 22px;
+}
+.summary h3 {
+  font-size: 17px;
+}
+.summary dl {
+  font-size: 14px;
+}
+.summary dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 15px 0;
+}
+.summary dt {
+  color: #748277;
+  flex-shrink: 0;
+}
+.summary dd {
+  margin: 0;
+  text-align: right;
+  line-height: 1.6;
+}
+.time-range {
+  display: block;
+}
+.summary .total {
+  border-top: 1px solid #dfe5db;
+  padding-top: 18px;
+  font-weight: 700;
+  font-size: 18px;
+}
+.reserve {
+  width: 100%;
+  margin-top: 10px;
+}
+.cancelled .booking-details {
+  text-decoration: line-through;
+  color: #949994;
+}
+dialog {
+  border: 1px solid #dfe5db;
+  border-radius: 18px;
+  padding: 30px;
+  width: min(440px, calc(100% - 32px));
+  color: #263d35;
+  box-shadow: 0 20px 80px #142c3430;
+}
+dialog::backdrop {
+  background: #15291f80;
+}
+.modal-copy {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #66766a;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+button:focus-visible {
+  outline: 3px solid #83a767;
+  outline-offset: 3px;
+}

@@ -1,0 +1,9 @@
+node_modules/
+data/
+dist/
+playwright-report/
+test-results/
+.DS_Store
+.claude/
+docs/.obsidian/
+docs/archive/
