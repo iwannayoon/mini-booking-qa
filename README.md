@@ -1,5 +1,7 @@
 # 틈 · Mini Booking QA
 
+[![Booking checks](https://github.com/iwannayoon/mini-booking-qa/actions/workflows/tests.yml/badge.svg)](https://github.com/iwannayoon/mini-booking-qa/actions/workflows/tests.yml)
+
 **요구사항 분석 → 테스트 케이스 설계 → 테스트 자동화**의 전 과정을 하나의 서비스로 보여 주는 QA 포트폴리오입니다.
 
 대상은 로컬에서 실행되는 작은 스터디룸 예약 서비스입니다. 기능을 많이 만드는 것이 아니라, **주어진 서비스를 무엇을 근거로, 어떤 기준으로, 어떻게 반복 가능하게 검증하는지**를 보여 주는 것이 목적입니다.
