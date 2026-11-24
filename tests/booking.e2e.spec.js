@@ -13,7 +13,7 @@ const pick = (page, time) =>
 // TC-B E2E 케이스. D는 테스트 시작 시 계산한 KST 내일이며, 생성한 예약·잠금은 finally에서 정리합니다.
 // 취소 이력 표시를 보는 케이스는 다른 테스트의 취소 이력과 묶이지 않도록 전용 날짜를 씁니다.
 import { apiLogin, date } from "./helpers/login.js";
-import { client, create, rows, cancelSlots } from "./helpers/booking.js";
+import { client, create, rows, cancelSlots, startClockServer } from "./helpers/booking.js";
 
 const at = (day, hour) => `${day}T${String(hour).padStart(2, "0")}:00:00+09:00`;
 const hours = Array.from({ length: 9 }, (_, i) => `${String(9 + i).padStart(2, "0")}:00`);
@@ -249,8 +249,8 @@ test.describe("TC-B 예약 화면", () => {
   });
 
   for (const [combo, fail, message] of [
-    ["A 503 응답", (route) => route.fulfill({ status: 503, json: { error: "잠시 후 다시 시도해 주세요." } }), "잠시 후 다시 시도해 주세요."],
-    ["B 네트워크 실패", (route) => route.abort("failed"), "연결에 문제가 발생했습니다."],
+    ["A 503 응답", (route) => route.fulfill({ status: 503, json: { error: "잠시 후 다시 시도해 주세요." } }), "예약 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."],
+    ["B 네트워크 실패", (route) => route.abort("failed"), "연결에 문제가 발생했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요."],
   ]) {
     test(`[TC-B-13] ${combo} 시 선택·요약 보존과 재확정`, async ({ page }) => {
       const D = date(1);
@@ -482,5 +482,178 @@ test.describe("TC-B 예약 화면", () => {
       for (const p of Object.values(pages)) await p.request.post("/api/logout");
       for (const context of contexts) await context.close();
     }
+  });
+});
+
+// 상황별 안내 문구와 실패 후 화면 상태를 검증합니다.
+test.describe("TC-B 예약 안내 메시지", () => {
+  // R-18의 문구를 기대값으로 사용합니다. 앱 코드를 바꾸거나 실패를 예상 성공 처리하지 않습니다.
+  // 각 테스트는 서버 시계가 고정된 실제 API와 독립된 임시 DB를 사용합니다.
+  const NOW = "2030-01-10T09:59:00+09:00";
+  const DAY = "2030-01-11";
+  const at = (day, hour) => `${day}T${hour}:00:00+09:00`;
+  const pick = (page, hour) => page.getByRole("button", { name: `${hour}:00 선택`, exact: true });
+  const reserve = (page) => page.getByRole("button", { name: "예약 확정하기", exact: true });
+  const message = (page) => page.getByRole("status");
+  const M = {
+    expired: "선택한 시간의 예약 가능 시간이 지났습니다. 다른 시간을 선택해 주세요.",
+    range: "예약은 현재부터 30일 미만의 시간만 가능합니다.",
+    invalid: "같은 날짜의 예약 가능한 시간을 선택해 주세요.",
+    booked: "선택한 시간 중 이미 예약된 시간이 있습니다. 다시 선택해 주세요.",
+    locked: "선택한 시간 중 잠긴 시간이 있습니다. 다시 선택해 주세요.",
+    session: "로그인이 필요합니다. 다시 로그인해 주세요.",
+    server: "예약 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+    network: "연결에 문제가 발생했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.",
+  };
+
+  const messageTest = test.extend({
+    clockServer: async ({ page }, use) => {
+      const server = await startClockServer(NOW);
+      try {
+        await page.clock.setFixedTime(new Date(NOW));
+        // UI는 기존 Vite 서버에서 제공하고 모든 API는 시계 제어 서버로 전달합니다.
+        // Origin도 대상 서버에 맞춰 전달하며 응답 상태·본문은 그대로 사용합니다.
+        await page.route("**/api/**", async route => {
+          const url = new URL(route.request().url());
+          const headers = { ...await route.request().allHeaders(), origin: server.baseURL };
+          const response = await route.fetch({ url: server.baseURL + url.pathname + url.search, headers });
+          await route.fulfill({ response });
+        });
+        await use(server);
+      } finally {
+        await page.unrouteAll({ behavior: "wait" });
+        await server.stop();
+      }
+    },
+  });
+
+  async function open(page) {
+    await page.goto("/");
+    await page.getByLabel("계정", { exact: true }).fill("alice");
+    await page.getByLabel("비밀번호", { exact: true }).fill("demo1234");
+    await page.getByRole("button", { name: "로그인", exact: true }).click();
+    await expect(pick(page, "09")).toBeEnabled();
+  }
+  async function move(page, day) {
+    const loaded = page.waitForResponse(r => r.url().includes(`/api/slots?date=${day}`));
+    await page.getByLabel("예약 날짜").fill(day);
+    await loaded;
+    await expect(page.locator(".slots button[aria-pressed]")).toHaveCount(9);
+    await expect(pick(page, "09")).toBeVisible();
+  }
+  async function apiClient(playwright, server, name = "alice") {
+    const client = await playwright.request.newContext({ baseURL: server.baseURL });
+    const login = await client.post("/api/login", { data: { username: name, password: "demo1234" } });
+    expect(login.status()).toBe(200);
+    return client;
+  }
+  async function submit(page, status) {
+    const response = page.waitForResponse(r => new URL(r.url()).pathname === "/api/bookings" && r.request().method() === "POST");
+    await reserve(page).click();
+    expect((await response).status()).toBe(status);
+  }
+  async function rejected(page, server, playwright, expected, hour = "10", day = DAY) {
+    const client = await apiClient(playwright, server);
+    try {
+      // 문구 비교 전에 예약 미생성과 화면 복구를 검증합니다.
+      expect(await rows(client)).toEqual([]);
+      await expect(pick(page, hour)).toHaveAttribute("aria-pressed", "true");
+      await expect(page.getByRole("region", { name: "예약 요약" })).toContainText(day);
+      await expect(page.locator(".summary .time-range")).toHaveText(`${hour}:00–${String(Number(hour) + 1).padStart(2, "0")}:00`);
+      await expect(reserve(page)).toBeEnabled();
+      await expect(reserve(page)).toHaveText("예약 확정하기");
+      await expect.soft(message(page)).toHaveText(expected);
+    } finally { await client.dispose(); }
+  }
+
+  for (const [label, now] of [["정확히 시작 시각", "2030-01-10T10:00:00+09:00"], ["시작 시각 경과", "2030-01-10T10:00:01+09:00"]]) {
+    messageTest(`[TC-B-26] ${label} 안내`, async ({ page, clockServer, playwright }) => {
+      await open(page);
+      await move(page, "2030-01-10");
+      await pick(page, "10").click();
+      await clockServer.setNow(now);
+      await page.clock.setFixedTime(new Date(now));
+      await submit(page, 400);
+      await rejected(page, clockServer, playwright, M.expired, "10", "2030-01-10");
+    });
+  }
+
+  for (const hour of ["10", "11"]) {
+    messageTest(`[TC-B-27] 30일 ${hour === "10" ? "경계" : "초과"} 안내`, async ({ page, clockServer, playwright }) => {
+      await clockServer.setNow("2030-01-10T10:00:00+09:00");
+      await open(page);
+      await pick(page, "10").click();
+      // 기간 밖 슬롯은 UI에서 선택할 수 없으므로 전송할 입력만 변경합니다.
+      // 서버의 실제 400과 오류 본문은 조작하지 않습니다.
+      await page.route("**/api/bookings", route => route.request().method() === "POST"
+        ? route.fallback({ postData: JSON.stringify({ slots: [at("2030-02-09", hour)] }) })
+        : route.fallback());
+      await submit(page, 400);
+      await rejected(page, clockServer, playwright, M.range);
+    });
+  }
+
+  for (const [label, slots] of [
+    ["빈 배열", []],
+    ["중복 슬롯", [at(DAY, "10"), at(DAY, "10")]],
+    ["서로 다른 날짜", [at(DAY, "10"), at("2030-01-12", "10")]],
+  ]) {
+    messageTest(`[TC-B-28] ${label} 입력 오류 안내`, async ({ page, clockServer, playwright }) => {
+      await open(page); await pick(page, "10").click();
+      // 브라우저가 만들지 않는 비정상 입력은 요청만 변경해 실제 서버에서 거부시킵니다.
+      await page.route("**/api/bookings", route => route.request().method() === "POST"
+        ? route.fallback({ postData: JSON.stringify({ slots }) }) : route.fallback());
+      await submit(page, 400);
+      await rejected(page, clockServer, playwright, M.invalid);
+    });
+  }
+
+  for (const mode of ["booked", "locked"]) {
+    messageTest(`[TC-B-29] 선택 후 ${mode === "booked" ? "다른 사용자 예약" : "관리자 잠금"} 안내`, async ({ page, clockServer, playwright }) => {
+      await open(page); await pick(page, "10").click();
+      const other = await apiClient(playwright, clockServer, mode === "booked" ? "bob" : "admin");
+      try {
+        const result = mode === "booked"
+          ? await other.post("/api/bookings", { data: { slot: at(DAY, "10") } })
+          : await other.put("/api/admin/slots", { data: { slot: at(DAY, "10"), blocked: true } });
+        expect(result.status()).toBe(mode === "booked" ? 201 : 200);
+        await submit(page, 409);
+        await rejected(page, clockServer, playwright, M[mode]);
+      } finally { await other.dispose(); }
+    });
+  }
+
+  messageTest("[TC-B-30] 예약 확정 시 세션 소멸 안내와 화면 초기화", async ({ page, clockServer, playwright }) => {
+    await open(page); await pick(page, "10").click();
+    // UI와 동일한 쿠키를 사용해 서버 세션을 실제로 제거합니다.
+    expect((await page.request.post(clockServer.baseURL + "/api/logout")).status()).toBe(200);
+    await submit(page, 401);
+    await expect(page.locator(".columns")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "로그아웃", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "로그인", exact: true })).toBeEnabled();
+    await expect(message(page)).toHaveText(M.session);
+    const client = await apiClient(playwright, clockServer);
+    try { expect(await rows(client)).toEqual([]); } finally { await client.dispose(); }
+  });
+
+  for (const status of [500, 503]) {
+    messageTest(`[TC-B-31] 서버 ${status} 공통 안내와 내부 정보 비노출`, async ({ page, clockServer, playwright }) => {
+      await open(page); await pick(page, "10").click();
+      await page.route("**/api/bookings", route => route.request().method() === "POST"
+        ? route.fulfill({ status, json: { error: "INTERNAL_DATABASE_SECRET" } }) : route.fallback());
+      await submit(page, status);
+      await rejected(page, clockServer, playwright, M.server);
+      await expect.soft(page.locator("body")).not.toContainText("INTERNAL_DATABASE_SECRET");
+    });
+  }
+
+  messageTest("[TC-B-32] 네트워크 실패 안내", async ({ page, clockServer, playwright }) => {
+    await open(page); await pick(page, "10").click();
+    await page.route("**/api/bookings", route => route.request().method() === "POST"
+      ? route.abort("failed") : route.fallback());
+    const failed = page.waitForEvent("requestfailed", { predicate: r => new URL(r.url()).pathname === "/api/bookings" && r.method() === "POST" });
+    await reserve(page).click(); await failed;
+    await rejected(page, clockServer, playwright, M.network);
   });
 });
